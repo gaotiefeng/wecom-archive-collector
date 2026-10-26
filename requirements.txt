@@ -1,0 +1,5 @@
+pymysql>=1.1.0
+PyYAML>=6.0
+cryptography>=43.0
+# 可选：只有 storage.type = s3 时才需要
+# boto3>=1.34

@@ -1,0 +1,61 @@
+# 复制为 config.yaml 后填写。config.yaml 里有密钥，记得加进 .gitignore。
+
+wecom:
+  corpid: "ww0000000000000000"
+  # 会话内容存档专用的 Secret（管理后台 -> 会话内容存档 里生成，不是应用 Secret）
+  secret: "REPLACE_ME_CHATDATA_SECRET"
+  # 私钥文件：后台生成的 RSA 密钥对，公钥已上传，私钥留在本机。
+  # 支持 PKCS#1 / PKCS#8 PEM。
+  private_key_path: "./secrets/private_key.pem"
+  # Rotation: if configured, each publickey_ver must have an explicit PEM path.
+  private_key_paths: {}
+  # Example: {"1": "./secrets/key-v1.pem", "2": "./secrets/key-v2.pem"}
+  # 会话存档 SDK 动态库路径；留空则按内置候选名自动查找
+  sdk_lib_path: ""
+  # 企业可信 IP 需包含本机出口 IP，否则 SDK Init/GetChatData 报错
+  proxy: ""
+  proxy_password: ""
+  timeout_seconds: 30
+  # 单批拉取条数，官方建议 1000 以内
+  batch_limit: 200
+
+# fake = 不连企微、不装 SDK，用合成数据跑通全链路（本地验证 schema 用）
+mode: fake
+
+mysql:
+  host: "127.0.0.1"
+  port: 3306
+  user: "root"
+  password: ""
+  database: "wecom_chatdata"
+  charset: "utf8mb4"
+  # 单条消息 raw 可能上百 KB，放宽点
+  max_allowed_packet: 67108864
+
+pull:
+  # 一轮拉完、没有新数据后睡多久
+  poll_interval_seconds: 5
+  # 单轮最多拉多少批，防止跑飞
+  max_batches_per_round: 50
+
+media:
+  enabled: true
+  # 并发下载数
+  workers: 4
+  # 0 = 不按推测的有效期放弃下载；应尽快下载，按当前官方规则确认期限
+  ttl_hours: 0
+  max_attempts: 8
+
+storage:
+  # local | s3
+  type: "local"
+  local_root: "./var/files"
+  # s3 用（type=s3 时生效，需 pip install boto3）
+  endpoint: ""
+  bucket: ""
+  access_key: ""
+  secret_key: ""
+  region: ""
+
+# 时间落库用哪个时区（固定偏移，不依赖 MySQL 的时区表）
+timezone_offset_hours: 8

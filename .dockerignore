@@ -1,0 +1,6 @@
+**
+!src/
+!src/*.py
+!schema.sql
+!requirements.txt
+!Dockerfile
