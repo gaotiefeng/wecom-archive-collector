@@ -1,0 +1,32 @@
+# Always run with -p wac-real to isolate from fake databases and volumes.
+services:
+  init:
+    volumes:
+      - type: bind
+        source: ./config.real.yaml
+        target: /app/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+  collector:
+    environment:
+      WECOM_CHATDATA_SECRET: ${WECOM_CHATDATA_SECRET:?Set archive secret in .env}
+    volumes:
+      - type: bind
+        source: ./config.real.yaml
+        target: /app/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./lib
+        target: /app/lib
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets
+        target: /app/secrets
+        read_only: true
+        bind:
+          create_host_path: false

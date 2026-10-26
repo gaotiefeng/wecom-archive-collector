@@ -76,7 +76,13 @@ class MediaWorker:
             self.failed += 1
             log.warning("media fail id=%s attempts=%s err=%r", mid, attempts, e)
 
-    def drain(self, batch: int = 20) -> dict[str, int]:
+    def _one_and_release(self, row):
+        try:
+            self._one(row)
+        finally:
+            self.db.close_thread()
+
+    def drain(self, batch: int = 20, stop=None) -> dict[str, int]:
         self.done = self.failed = self.expired = 0
         if not self.cfg.media.enabled:
             return {"done": 0, "failed": 0, "expired": 0}
@@ -91,11 +97,15 @@ class MediaWorker:
 
         try:
             with ThreadPoolExecutor(max_workers=max(1, self.cfg.media.workers)) as pool:
-                while True:
-                    rows = self.db.claim_media(batch)
+                remaining = self.cfg.media.max_items_per_round
+                while remaining > 0 and not (stop and stop.is_set()):
+                    # Claim only active workers so queued tasks do not age while
+                    # awaiting a slow download. The cap is per round, not per query.
+                    rows = self.db.claim_media(min(batch, remaining, self.cfg.media.workers))
                     if not rows:
                         break
-                    list(pool.map(self._one, rows))
+                    list(pool.map(self._one_and_release, rows))
+                    remaining -= len(rows)
         finally:
             for handle in self._handles:
                 handle.close()

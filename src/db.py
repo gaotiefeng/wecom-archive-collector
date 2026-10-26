@@ -76,7 +76,7 @@ class DB:
                 if getattr(self._local, "collector_lock", False):
                     raise RuntimeError("collector database connection lost; restart to reacquire lock")
                 with contextlib.suppress(Exception):
-                    c.close()
+                    self.close_thread()
         c = self._new_conn()
         self._local.conn = c
         with self._lock:
@@ -96,6 +96,19 @@ class DB:
             raise
         finally:
             cur.close()
+
+    def close_thread(self) -> None:
+        """Release only the calling thread's connection; preserve collector lock."""
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            return
+        with self._lock:
+            self._all = [c for c in self._all if c is not conn]
+        try:
+            conn.close()
+        finally:
+            del self._local.conn
+            self._local.collector_lock = False
 
     def close(self) -> None:
         with self._lock:

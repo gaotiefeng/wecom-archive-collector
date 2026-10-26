@@ -15,6 +15,8 @@ import argparse
 import json
 import logging
 import sys
+import signal
+import threading
 from pathlib import Path
 
 from . import config as config_mod
@@ -43,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("init-db")
+    sub.add_parser("check-sdk", help="load SDK and private keys without fetching messages")
     p_pull = sub.add_parser("pull")
     p_pull.add_argument("--once", action="store_true")
     sub.add_parser("media")
@@ -81,6 +84,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         sdk = sdk_mod.build(cfg, fake=args.fake)
+        if args.cmd == "check-sdk":
+            if cfg.mode != "real":
+                raise ValueError("check-sdk requires mode: real")
+            from cryptography.hazmat.primitives.serialization import load_pem_private_key
+            for pem in sdk._keys.values() if sdk._keys else [sdk._priv]:
+                load_pem_private_key(pem.encode() if isinstance(pem, str) else pem, password=None)
+            print("SDK loaded and local private keys parsed; API permissions/connectivity NOT verified")
+            return 0
         store = storage_mod.build(cfg)
         factory = lambda: sdk_mod.build(cfg, fake=args.fake)
         if not db.acquire_collector_lock():
@@ -103,13 +114,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "run":
             p = Puller(cfg, db, sdk)
             w = media_mod.MediaWorker(cfg, db, store, factory)
-            while True:
+            stop = threading.Event()
+            def shutdown(*_):
+                stop.set()
+                p.stop()
+            signal.signal(signal.SIGTERM, shutdown)
+            signal.signal(signal.SIGINT, shutdown)
+            while not stop.is_set():
                 n = p.run_until_idle()
-                w.drain()
+                if stop.is_set():
+                    break
+                w.drain(stop=stop)
                 if n == 0:
-                    import time
-                    time.sleep(cfg.pull.poll_interval_seconds)
-            # unreachable
+                    stop.wait(cfg.pull.poll_interval_seconds)
     finally:
         if sdk is not None:
             sdk.close()

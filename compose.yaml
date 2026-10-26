@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: wecom_chatdata
+      MYSQL_USER: collector
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      TZ: Asia/Shanghai
+    command: ["--max-allowed-packet=64M"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u collector wecom_chatdata -e "SELECT 1"']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  init:
+    build: .
+    image: wecom-archive-collector:local
+    command: ["init-db"]
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+    volumes:
+      - ./config.docker.yaml:/app/config.yaml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+  collector:
+    build: .
+    image: wecom-archive-collector:local
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+    volumes:
+      - ./config.docker.yaml:/app/config.yaml:ro
+      - media_data:/app/var/files
+    depends_on:
+      init:
+        condition: service_completed_successfully
+volumes:
+  mysql_data:
+  media_data:

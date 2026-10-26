@@ -1,5 +1,8 @@
 # WeCom Archive Collector
 
+> **v0.1.0 预发布：真实消息联调尚未完成，需要已开通会话存档的企业账号测试。**
+> 已验证 Fake 采集、Docker/MySQL 流程和官方 ARM v3 SDK 本地加载；尚未验证真实消息拉取、解密及媒体下载，不应视为生产可用。
+
 单企业企业微信会话内容存档采集工具：拉取、解密、MySQL 入库、附件下载。
 不包含管理后台、敏感词风控、语音转写。当前为待真实 SDK 联调的预发布版本，不能声称已通过生产验证。
 
@@ -90,7 +93,7 @@ MIT，见 LICENSE。腾讯 SDK 和其他依赖各自遵循其许可证。
 
 ## 容器运行
 
-Dockerfile 不包含数据库、配置、媒体或腾讯 SDK。构建后需要挂载只读配置和 SDK 目录、私钥目录，以及可写的媒体目录。容器以 UID 10001 运行，挂载目录须给该 UID 适当权限。根据官方 SDK 的依赖清单补充系统库；镜像尚未做真实 SDK 构建与运行验证。容器中的数据库地址不能填宿主机含义的 `127.0.0.1`。
+Dockerfile 不包含数据库、配置、媒体或腾讯 SDK。构建后需要挂载只读配置和 SDK 目录、私钥目录，以及可写的媒体目录。容器以 UID 10001 运行，挂载目录须给该 UID 适当权限。根据官方 SDK 的依赖清单补充系统库；镜像已完成 Fake 模式构建与运行验证；真实 SDK 加载仍待验证。容器中的数据库地址不能填宿主机含义的 `127.0.0.1`。
 
 
 ## 项目名称与迁移
@@ -98,3 +101,42 @@ Dockerfile 不包含数据库、配置、媒体或腾讯 SDK。构建后需要�
 仓库名称建议：`wecom-archive-collector`。这是独立的社区采集工具，与腾讯及其他同名存档产品无隶属关系。
 
 移动项目后，请在新目录重新创建 Python 虚拟环境；旧虚拟环境的激活脚本和命令入口可能仍引用旧路径。本地配置与附件已保留，但不应提交。MySQL 库名可继续使用 `wecom_chatdata`，无需因仓库改名而修改。
+
+
+## Docker Compose 本地演示（Fake）
+
+```bash
+cp .env.example .env
+cp config.docker.example.yaml config.docker.yaml
+# 修改 .env 中两个独立密码后执行：
+docker compose up -d --build
+docker compose run --rm --no-deps collector stats
+docker compose logs --tail=100 collector
+docker compose stop collector
+```
+
+MySQL 不映射宿主机端口，不会占用现有本地数据库。初始化服务在数据库健康后建表，然后启动采集。
+图片/文件保存在 Docker 命名卷 media_data，数据库在 mysql_data；`docker compose down` 保留数据，`down -v` 会删除数据，不要随意执行。
+容器以 UID 10001 运行，命名卷首次挂载继承镜像目录权限。如果改成宿主机目录挂载，需要自行给 UID 10001 写权限。
+
+真实采集：将 config.docker.yaml 改为真实配置，额外挂载只读官方 C SDK 和私钥目录，配置容器内绝对路径。SDK 的 CPU 架构必须匹配容器；镜像已包含常用运行库，但应按实际 SDK 的依赖检查补充。SDK、私钥不能 COPY 进镜像。
+S3 镜像构建使用 `docker build --build-arg WITH_S3=true -t wecom-archive-collector:s3 .`。
+SIGTERM 会等待当前批次/附件处理完成后退出；60 秒内未完成仍可能被 Docker 强制终止，重启后需等超时媒体任务回收。
+
+
+### 已执行的容器验证
+
+2026-10-26，在本机 OrbStack 上构建 ARM64 镜像，使用独立 MySQL 8.0.34 测试容器：
+
+- 初始化服务成功创建五张表，Fake 采集保存 12 条消息，游标为 12。
+- 4 个模拟附件持久化，逐个核对大小及可用 MD5；1 个模拟失效附件进入 expired。
+- 中文检索通过；应用以 UID 10001 运行。
+- SIGTERM 停止退出码为 0；重建采集容器后消息数量不变、附件仍存在。
+- 镜像内 6 项离线测试全部通过。
+
+不包含真实 SDK、实际企业消息、S3 可选构建或 AMD64 构建验证。测试容器和网络已移除，命名卷保留。
+
+
+## 真实部署与资源限制
+
+见 [真实部署指南](DEPLOYMENT_REAL.md)。媒体任务每轮默认最多处理 20 个，可配置 `media.max_items_per_round`；处理结束释放当前线程数据库连接。`media` 命令现在也是单轮有界处理，需要再次运行或使用常驻 `run`。`check-sdk` 仅检查本地 SDK 和私钥，不验证 API 授权。

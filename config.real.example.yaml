@@ -1,0 +1,27 @@
+# Copy to config.real.yaml; set actual publickey_ver below.
+mode: real
+wecom:
+  corpid: "REPLACE_WITH_CORPID"
+  secret: "" # supply WECOM_CHATDATA_SECRET through .env
+  sdk_lib_path: /app/lib/libWeWorkFinanceSdk_C.so
+  private_key_paths:
+    "1": /app/secrets/key-v1.pem
+  timeout_seconds: 30
+  batch_limit: 200
+mysql:
+  host: db
+  user: collector
+  database: wecom_chatdata
+storage:
+  type: local
+  local_root: /app/var/files
+media:
+  enabled: true
+  workers: 4
+  max_items_per_round: 20
+  ttl_hours: 0
+  max_attempts: 8
+pull:
+  poll_interval_seconds: 5
+  max_batches_per_round: 10
+timezone_offset_hours: 8

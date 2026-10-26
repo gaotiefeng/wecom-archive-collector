@@ -42,6 +42,7 @@ media:
   enabled: true
   # 并发下载数
   workers: 4
+  max_items_per_round: 20
   # 0 = 不按推测的有效期放弃下载；应尽快下载，按当前官方规则确认期限
   ttl_hours: 0
   max_attempts: 8

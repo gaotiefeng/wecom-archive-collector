@@ -1,0 +1,18 @@
+# Compose 本地演示配置，不连接企业微信。
+mode: fake
+mysql:
+  host: db
+  user: collector
+  database: wecom_chatdata
+  # 密码由 MYSQL_PASSWORD 环境变量注入
+storage:
+  type: local
+  local_root: /app/var/files
+media:
+  enabled: true
+  workers: 2
+  max_items_per_round: 20
+  ttl_hours: 0
+pull:
+  poll_interval_seconds: 5
+  max_batches_per_round: 10

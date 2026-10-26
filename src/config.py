@@ -46,6 +46,7 @@ class PullCfg:
 class MediaCfg:
     enabled: bool = True
     workers: int = 4
+    max_items_per_round: int = 20
     ttl_hours: int = 0  # 0: do not discard media based on an assumed TTL
     max_attempts: int = 8
 
@@ -116,6 +117,8 @@ def load(path: str | os.PathLike | None = None) -> Config:
         raise ValueError("storage.type must be local or s3")
     if not 1 <= cfg.wecom.batch_limit <= 1000:
         raise ValueError("batch_limit must be between 1 and 1000")
+    if cfg.media.max_items_per_round < 1:
+        raise ValueError("max_items_per_round must be positive")
     if cfg.media.workers < 1 or cfg.media.max_attempts < 1:
         raise ValueError("workers and max_attempts must be positive")
     if cfg.pull.poll_interval_seconds <= 0 or cfg.pull.max_batches_per_round < 1:

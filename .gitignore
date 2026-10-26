@@ -20,3 +20,7 @@ __pycache__/
 *.pyc
 
 .DS_Store
+
+config.docker.yaml
+
+config.real.yaml
